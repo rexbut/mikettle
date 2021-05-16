@@ -3,6 +3,7 @@ Read data from Mi Kettle.
 """
 
 import logging
+import codecs
 from bluepy.btle import UUID, Peripheral, DefaultDelegate
 from datetime import datetime, timedelta
 from threading import Lock
@@ -10,15 +11,15 @@ from threading import Lock
 _KEY1 = bytes([0x90, 0xCA, 0x85, 0xDE])
 _KEY2 = bytes([0x92, 0xAB, 0x54, 0xFA])
 
-_HANDLE_READ_FIRMWARE_VERSION = 26
+_HANDLE_READ_FIRMWARE_VERSION = 10
 _HANDLE_READ_NAME = 20
-_HANDLE_AUTH_INIT = 44
-_HANDLE_AUTH = 37
-_HANDLE_VERSION = 42
+_HANDLE_AUTH_INIT = 19
+_HANDLE_AUTH = 3
+_HANDLE_VERSION = 4
 _HANDLE_STATUS = 61
 
 _UUID_SERVICE_KETTLE = "fe95"
-_UUID_SERVICE_KETTLE_DATA = "01344736-0000-1000-8000-262837236156"
+_UUID_SERVICE_KETTLE_DATA = "fe95"
 
 _SUBSCRIBE_TRUE = bytes([0x01, 0x00])
 
@@ -48,6 +49,7 @@ MI_KW_TYPE_MAP = {
 }
 
 _LOGGER = logging.getLogger(__name__)
+_LOGGER.setLevel(logging.DEBUG)
 
 
 class MiKettle(object):
@@ -68,7 +70,7 @@ class MiKettle(object):
         self._cache_timeout = timedelta(seconds=cache_timeout)
         self._last_read = None
         self.retries = retries
-        self.ble_timeout = 10
+        self.ble_timeout = 1000
         self.lock = Lock()
 
         self._product_id = product_id
@@ -84,8 +86,6 @@ class MiKettle(object):
 
     def name(self):
         """Return the name of the device."""
-        self.connect()
-        self.auth()
         name = self._p.readCharacteristic(_HANDLE_READ_NAME)
 
         if not name:
@@ -95,8 +95,6 @@ class MiKettle(object):
 
     def firmware_version(self):
         """Return the firmware version."""
-        self.connect()
-        self.auth()
         firmware_version = self._p.readCharacteristic(_HANDLE_READ_FIRMWARE_VERSION)
 
         if not firmware_version:
@@ -132,9 +130,7 @@ class MiKettle(object):
         _LOGGER.debug('Filling cache with new sensor data.')
         try:
             _LOGGER.debug('Connect')
-            self.connect()
             _LOGGER.debug('Auth')
-            self.auth()
             _LOGGER.debug('Subscribe')
             self.subscribeToData()
             _LOGGER.debug('Wait for data')
@@ -173,8 +169,11 @@ class MiKettle(object):
             result = result * 256 + int(b)
 
         return result
+        
+    def get(self, i):
+        return self._p.readCharacteristic(i)
 
-    def auth(self):
+    def auth(self):    
         auth_service = self._p.getServiceByUUID(_UUID_SERVICE_KETTLE)
         auth_descriptors = auth_service.getDescriptors()
 
@@ -189,8 +188,21 @@ class MiKettle(object):
         self._p.waitForNotifications(10.0)
 
         self._p.writeCharacteristic(_HANDLE_AUTH, MiKettle.cipher(self._token, _KEY2), "true")
-
-        self._p.readCharacteristic(_HANDLE_VERSION)
+        
+        result = self._p.readCharacteristic(_HANDLE_VERSION)
+        _LOGGER.debug('HANDLE_VERSION %s', result)
+        
+        for i in range(0, 27):
+        
+            result = self._p.readCharacteristic(i)
+            _LOGGER.debug('test %i : %s : %s', i , result, result.hex())
+        
+        _LOGGER.debug('token: %s', self._token.hex())
+        
+        
+        """
+        Initialize a Mi Kettle for the given MAC address.
+        """
 
     def subscribeToData(self):
         controlService = self._p.getServiceByUUID(_UUID_SERVICE_KETTLE_DATA)
@@ -200,7 +212,7 @@ class MiKettle(object):
     # TODO: Actually generate random token instead of static one
     @staticmethod
     def generateRandomToken() -> bytes:
-        return bytes([0x01, 0x5C, 0xCB, 0xA8, 0x80, 0x0A, 0xBD, 0xC1, 0x2E, 0xB8, 0xED, 0x82])
+        return bytes([0x02, 0x5C, 0xCB, 0xA8, 0x80, 0x0A, 0xBD, 0xC1, 0x2E, 0xB8, 0xED, 0x83])
 
     @staticmethod
     def reverseMac(mac) -> bytes:
@@ -256,6 +268,8 @@ class MiKettle(object):
         return MiKettle._cipherCrypt(input, perm)
 
     def handleNotification(self, cHandle, data):
+        _LOGGER.debug("handleNotification data (Handle:%s, data: %s)", cHandle, data.hex())
+        _LOGGER.debug("Test: %s", (MiKettle.cipher(MiKettle.mixB(self._reversed_mac, self._product_id), MiKettle.cipher(MiKettle.mixA(self._reversed_mac,self._product_id),data))).hex())
         if cHandle == _HANDLE_AUTH:
             if(MiKettle.cipher(MiKettle.mixB(self._reversed_mac, self._product_id),
                                MiKettle.cipher(MiKettle.mixA(self._reversed_mac,

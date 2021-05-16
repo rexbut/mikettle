@@ -41,16 +41,25 @@ def connect(args):
     logging.getLogger().setLevel(logging.DEBUG)
 
     kettle = MiKettle(args.mac, args.product_id)
+    print("Connect")
+    kettle.connect()
     print("Authenticating")
+    kettle.auth()
     print("Getting data from mi Kettle")
     print("FW: {}".format(kettle.firmware_version()))
-    print("Name: {}".format(kettle.name()))
-
-    try:
-      print("Current temperature: {}".format(kettle.parameter_value(MI_CURRENT_TEMPERATURE)))
-    except Exception as error:
-      print("Read failed")
-      print(error)
+    
+    # for i in range(43521, 43530):
+        # try:
+            # kettle.connect()
+            # kettle.auth()
+            # result = kettle.getTest(i)
+            # _LOGGER.debug('test %i : %s : %s', i , result, result.hex())
+            
+        # except Exception as error:
+          # kettle.connect()
+          # kettle.auth()
+          # print("Read failed")
+          # print(error)
 
 def main():
     """Main function.
