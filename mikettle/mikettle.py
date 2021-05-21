@@ -235,6 +235,7 @@ class MiKettle(object):
 
         self._p.writeCharacteristic(3, MiKettle.cipher(self._token, bytes([0x92, 0xAB, 0x54, 0xFA])), "true")
         
+        _LOGGER.info('TOKEN: %s', self._token.hex())
         _LOGGER.info('firmware_version: %s', MiKettle.cipher(self._token, self._p.readCharacteristic(10)).decode())
         _LOGGER.info('beaconkey: %s', MiKettle.cipher(self._token, self._p.readCharacteristic(25)).hex())
         
@@ -306,8 +307,6 @@ class MiKettle(object):
         return MiKettle._cipherCrypt(input, perm)
 
     def handleNotification(self, cHandle, data):
-        _LOGGER.debug("handleNotification data (Handle:%s, data: %s)", cHandle, data.hex())
-        _LOGGER.debug("Test: %s", (MiKettle.cipher(MiKettle.mixB(self._reversed_mac, self._product_id), MiKettle.cipher(MiKettle.mixA(self._reversed_mac,self._product_id),data))).hex())
         if cHandle == _HANDLE_AUTH:
             if(MiKettle.cipher(MiKettle.mixB(self._reversed_mac, self._product_id),
                                MiKettle.cipher(MiKettle.mixA(self._reversed_mac,
