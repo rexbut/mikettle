@@ -46,20 +46,6 @@ def connect(args):
     print("Authenticating")
     kettle.auth()
     print("Getting data from mi Kettle")
-    print("FW: {}".format(kettle.firmware_version()))
-    
-    # for i in range(43521, 43530):
-        # try:
-            # kettle.connect()
-            # kettle.auth()
-            # result = kettle.getTest(i)
-            # _LOGGER.debug('test %i : %s : %s', i , result, result.hex())
-            
-        # except Exception as error:
-          # kettle.connect()
-          # kettle.auth()
-          # print("Read failed")
-          # print(error)
 
 def main():
     """Main function.

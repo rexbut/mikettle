@@ -15,7 +15,7 @@ _HANDLE_READ_FIRMWARE_VERSION = 10
 _HANDLE_READ_NAME = 20
 _HANDLE_AUTH_INIT = 19
 _HANDLE_AUTH = 3
-_HANDLE_VERSION = 4
+_HANDLE_VERSION = 10
 _HANDLE_STATUS = 61
 
 _UUID_SERVICE_KETTLE = "fe95"
@@ -101,6 +101,15 @@ class MiKettle(object):
             raise Exception("Could not read FIRMWARE_VERSION using handle %s"
                             " from Mi Kettle %s" % (_HANDLE_READ_FIRMWARE_VERSION, self._mac))
         return ''.join(chr(n) for n in firmware_version)
+    
+    def firmware_version(self):
+        """Return the firmware version."""
+        firmware_version = self._p.readCharacteristic(_HANDLE_READ_FIRMWARE_VERSION)
+
+        if not firmware_version:
+            raise Exception("Could not read FIRMWARE_VERSION using handle %s"
+                            " from Mi Kettle %s" % (_HANDLE_READ_FIRMWARE_VERSION, self._mac))
+        return ''.join(chr(n) for n in firmware_version)
 
     def parameter_value(self, parameter, read_cached=True):
         """Return a value of one of the monitored paramaters.
@@ -177,28 +186,57 @@ class MiKettle(object):
         auth_service = self._p.getServiceByUUID(_UUID_SERVICE_KETTLE)
         auth_descriptors = auth_service.getDescriptors()
 
-        self._p.writeCharacteristic(_HANDLE_AUTH_INIT, _KEY1, "true")
+        # ID: 1191 
+        # Data: 02 02 00 0b 00 07 00 04 00 12 13 00 90 ca 85 de
+        # Opcode: Write Request (0x12)
+        # Handle: 0x0013 (Xiaomi Inc.: UPNP)
+        # Value: 90ca85de
+        self._p.writeCharacteristic(19, bytes([0x90, 0xCA, 0x85, 0xDE]), "true")
+        
+        # ID: 1193
+        # Data: 02 02 20 05 00 01 00 04 00 13
+        # Opcode: Write Response (0x13)
 
-        auth_descriptors[1].write(_SUBSCRIBE_TRUE, "true")
+        # ID: 1194
+        # Data: 02 02 00 09 00 05 00 04 00 12 04 00 01 00
+        # Opcode: Write Request (0x12)
+        # Characteristic Configuration Client: 0x0001, Notification
+        auth_descriptors[1].write(bytes([0x01, 0x00]), "true")
 
-        self._p.writeCharacteristic(_HANDLE_AUTH,
-                                    MiKettle.cipher(MiKettle.mixA(self._reversed_mac, self._product_id), self._token),
-                                    "true")
+        # ID: 1196
+        # Data: 02 02 20 05 00 01 00 04 00 13
+        # Opcode: Write Response (0x13)
+
+        # ID: 1197
+        # Data: 02 02 00 13 00 0f 00 04 00 12 03 00 4c 1d f4 7d 06 5b 69 ca 16 00 a5 1c
+        # Opcode: Write Request (0x12)
+        # Handle: 0x0003 (Xiaomi Inc.: SDP)
+        # Value: 4c1df47d065b69ca1600a51c
+
+        self._p.writeCharacteristic(3, MiKettle.cipher(MiKettle.mixA(self._reversed_mac, self._product_id), self._token), "true")
+
+        # ID: 1199
+        # Data: 02 02 20 05 00 01 00 04 00 13
+        # Opcode: Write Response (0x13)
+
+        # ID: 1200
+        # Data: 02 02 20 13 00 0f 00 04 00 1b 03 00 52 70 95 05 9a 51 9d a2 f7 0c 88 75
+        # Opcode: Handle Value Notification (0x1b)
+        # Handle: 0x0003 (Xiaomi Inc.: SDP)
+        # Value: 527095059a519da2f70c8875
 
         self._p.waitForNotifications(10.0)
 
-        self._p.writeCharacteristic(_HANDLE_AUTH, MiKettle.cipher(self._token, _KEY2), "true")
+        # ID: 1201
+        # Data: 02 02 00 0b 00 07 00 04 00 12 03 00 b5 99 1c 85
+        # Opcode: Write Request (0x12)
+        # Handle: 0x0003 (Xiaomi Inc.: SDP)
+        # Value: b5991c85
+
+        self._p.writeCharacteristic(3, MiKettle.cipher(self._token, bytes([0x92, 0xAB, 0x54, 0xFA])), "true")
         
-        result = self._p.readCharacteristic(_HANDLE_VERSION)
-        _LOGGER.debug('HANDLE_VERSION %s', result)
-        
-        for i in range(0, 27):
-        
-            result = self._p.readCharacteristic(i)
-            _LOGGER.debug('test %i : %s : %s', i , result, result.hex())
-        
-        _LOGGER.debug('token: %s', self._token.hex())
-        
+        _LOGGER.info('firmware_version: %s', MiKettle.cipher(self._token, self._p.readCharacteristic(10)).decode())
+        _LOGGER.info('beaconkey: %s', MiKettle.cipher(self._token, self._p.readCharacteristic(25)).hex())
         
         """
         Initialize a Mi Kettle for the given MAC address.
@@ -212,7 +250,7 @@ class MiKettle(object):
     # TODO: Actually generate random token instead of static one
     @staticmethod
     def generateRandomToken() -> bytes:
-        return bytes([0x02, 0x5C, 0xCB, 0xA8, 0x80, 0x0A, 0xBD, 0xC1, 0x2E, 0xB8, 0xED, 0x83])
+        return bytes([0x01, 0x5C, 0xCB, 0xA8, 0x80, 0x0A, 0xBD, 0xC1, 0x2E, 0xB8, 0xED, 0x82])
 
     @staticmethod
     def reverseMac(mac) -> bytes:
