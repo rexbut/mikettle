@@ -6,7 +6,7 @@
 # 
 # List of PRODUCT_ID:
 #   339: For 'YLYK01YL'
-#   950: For 'YLKG08YL'
+#   950: For 'YLKG07YL' and 'YLKG08YL'
 #
 # Example: 
 #   python3 get_beacon_key.py AB:CD:EF:12:34:56 950
@@ -120,7 +120,7 @@ def main(argv):
         print("usage: get_beacon_key.py <MAC> <PRODUCT_ID>\n")
         print("PRODUCT_ID:")
         print("  339: For 'YLYK01YL'")
-        print("  950: For 'YLKG08YL'")
+        print("  950: For 'YLKG07YL' and 'YLKG08YL'")
         return
 
     # MAC
