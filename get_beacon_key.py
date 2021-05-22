@@ -2,10 +2,14 @@
 
 # Usage:
 #   pip3 install bluepy
-#   python3 get_beacon_key.py <MAC>
+#   python3 get_beacon_key.py <MAC> <PRODUCT_ID>
+# 
+# List of PRODUCT_ID:
+#   339: For 'YLYK01YL'
+#   950: For 'YLKG08YL'
 #
 # Example: 
-#   python3 get_beacon_key.py AB:CD:EF:12:34:56
+#   python3 get_beacon_key.py AB:CD:EF:12:34:56 950
 
 from bluepy.btle import UUID, Peripheral, DefaultDelegate
 
@@ -14,8 +18,6 @@ import re
 import sys
 
 MAC_PATTERN = r"^[0-9A-F]{2}:[0-9A-F]{2}:[0-9A-F]{2}:[0-9A-F]{2}:[0-9A-F]{2}:[0-9A-F]{2}$"
-
-PRODUCT_ID = 950
 
 UUID_SERVICE = "fe95"
 
@@ -82,7 +84,7 @@ def generateRandomToken() -> bytes:
         token.extend(bytes([random.randint(0,255)]))
     return token
 
-def get_beacon_key(mac):
+def get_beacon_key(mac, product_id):
     reversed_mac = reverseMac(mac)
     token = generateRandomToken()
 
@@ -100,7 +102,7 @@ def get_beacon_key(mac):
     auth_descriptors = auth_service.getDescriptors()
     peripheral.writeCharacteristic(HANDLE_AUTH_INIT, MI_KEY1, "true")
     auth_descriptors[1].write(SUBSCRIBE_TRUE, "true")
-    peripheral.writeCharacteristic(HANDLE_AUTH, cipher(mixA(reversed_mac, PRODUCT_ID), token), "true")
+    peripheral.writeCharacteristic(HANDLE_AUTH, cipher(mixA(reversed_mac, product_id), token), "true")
     peripheral.waitForNotifications(10.0)
     peripheral.writeCharacteristic(3, cipher(token, MI_KEY2), "true")
     print("Successful authentication!")
@@ -112,12 +114,31 @@ def get_beacon_key(mac):
     print(f"beaconKey: '{beacon_key}'")
     print(f"firmware_version: '{firmware_version}'")
 
+def main(argv):
+    # ARGS
+    if len(argv) <= 2 : 
+        print("usage: get_beacon_key.py <MAC> <PRODUCT_ID>\n")
+        print("PRODUCT_ID:")
+        print("  339: For 'YLYK01YL'")
+        print("  950: For 'YLKG08YL'")
+        return
+
+    # MAC
+    mac = argv[1].upper()
+    if not re.compile(MAC_PATTERN).match(mac):
+        print(f"[ERROR] The MAC address '{mac}' seems to be in the wrong format")
+        return
+
+    # PRODUCT_ID  
+    product_id = argv[2]
+    try:
+        product_id = int(product_id)
+    except Exception:
+        print(f"[ERROR] The Product Id '{product_id}' seems to be in the wrong format")
+        return
+
+    # BEACON_KEY
+    get_beacon_key(mac, product_id)
+
 if __name__ == '__main__':
-    if len(sys.argv) > 1 : 
-        mac = sys.argv[1].upper()
-        if re.compile(MAC_PATTERN).match(mac):
-            get_beacon_key(mac) 
-        else:
-            print(f"[ERROR] The MAC address '{mac}' seems to be in the wrong format")
-    else:
-        print("usage: get_beacon_key.py <MAC>")
+    main(sys.argv)
